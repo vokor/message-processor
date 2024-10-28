@@ -1,5 +1,14 @@
+import hashlib
 import tkinter as tk
 
+from processors import TelegramProcessor, Platform
+
+def get_hash(value):
+    value_str = str(value)
+    hash_object = hashlib.sha256(value_str.encode())
+    hash_int = int(hash_object.hexdigest(), 16)
+    scaled_value = hash_int % int(1e6)
+    return scaled_value
 
 def catch_command_errors(command_name):
     def catch_error(func):
@@ -26,3 +35,14 @@ def catch_command_errors(command_name):
 def read_file(filename):
     with open(filename, "r") as f:
         return f.read()
+
+
+def get_processor(platform, data):
+    if platform == Platform.TELEGRAM:
+        return TelegramProcessor(data)
+    elif platform == Platform.WHATSAPP:
+        raise Exception("Not implemented")
+    elif platform == Platform.VK:
+        raise Exception("Not implemented")
+    else:
+        raise Exception(f"Unknown platform: {platform}\n")
