@@ -1,9 +1,20 @@
+import json
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import font
 
-from utils import catch_command_errors, read_file, get_processor
-from processors import Platform, TelegramProcessor, WhatsappProcessor
+from utils import catch_command_errors, read_file
+# from processors import Platform, TelegramProcessor, WhatsappProcessor
+
+# def get_processor(platform, data):
+#     if platform == Platform.TELEGRAM:
+#         return TelegramProcessor(data)
+#     elif platform == Platform.WHATSAPP:
+#         raise Exception("Not implemented")
+#     elif platform == Platform.VK:
+#         raise Exception("Not implemented")
+#     else:
+#         raise Exception(f"Unknown platform: {platform}\n")
 
 # class Application(tk.Frame):
 #     def __init__(self, master=None):
@@ -70,8 +81,10 @@ from processors import Platform, TelegramProcessor, WhatsappProcessor
 
 
 data = read_file("/home/vladimir/Git/message-processor/result.json")
-processor = TelegramProcessor(data)
-chats = processor.parse()
+parsed_json = json.loads(data)
+print("ff")
+# processor = TelegramProcessor(data)
+# chats = processor.parse()
 
 
 
