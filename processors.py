@@ -1,23 +1,11 @@
 import json
 import pandas as pd
 from abc import ABC, abstractmethod
-from turtledemo.forest import start
 
 from data_extractor import TelegramMessageProcessor
 from utils import get_hash
 
 DEFAULT_VALUE = 'nan'
-
-class Platform:
-    TELEGRAM = "telegram"
-    WHATSAPP = "whatsapp"
-    VK = "vk"
-
-PLATFORM_TO_ID = {
-    Platform.TELEGRAM: 1,
-    Platform.WHATSAPP: 2,
-    Platform.VK: 3,
-}
 
 class Processor(ABC):
     def __init__(self, name, custom_target_user_id):
