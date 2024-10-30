@@ -1,6 +1,26 @@
 import hashlib
 import tkinter as tk
 
+DEFAULT_VALUE = 'nan'
+DEFAULT_VALUE_NUM = -1
+class Platform:
+    TELEGRAM = "telegram"
+    WHATSAPP = "whatsapp"
+    VK = "vk"
+
+class MessageType:
+    MESSAGE = "0"
+    MESSAGE_VIDEO = "1"
+    CALL_VOICE = "2"
+    CALL_VIDEO = "3"
+    CALL_UNDEFINED = "4"
+
+PLATFORM_TO_ID = {
+    Platform.TELEGRAM: 1,
+    Platform.WHATSAPP: 2,
+    Platform.VK: 3,
+}
+
 def get_hash(value):
     value_str = str(value)
     hash_object = hashlib.sha256(value_str.encode())
