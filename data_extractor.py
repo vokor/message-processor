@@ -2,50 +2,41 @@ import re
 import json
 
 import emoji
+from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
 from collections import defaultdict
 
+from utils import PLATFORM_TO_ID, MessageType, DEFAULT_VALUE
 
-class Platform:
-    TELEGRAM = "telegram"
-    WHATSAPP = "whatsapp"
-    VK = "vk"
-
-class MessageType:
-    MESSAGE = "0"
-    MESSAGE_VIDEO = "1"
-    CALL_VOICE = "2"
-    CALL_VIDEO = "3"
-    CALL_UNDEFINED = "4"
-
-PLATFORM_TO_ID = {
-    Platform.TELEGRAM: 1,
-    Platform.WHATSAPP: 2,
-    Platform.VK: 3,
-}
 
 class MessageProcessor(ABC):
-    def __init__(self):
+    def __init__(self, user_id_mapper):
         self.context = {}
         self.data = defaultdict(list)
+        self.need_append_message = True
+        self.time_border = int((datetime.now() - timedelta(days=5 * 365)).timestamp())
+        self.user_id_mapper = user_id_mapper
 
     def process(self, message):
-        self.update_aggregated_chat_info(message)
         self.message = message
-        self.data['partner_user_nickname'].append(self.get_partner_user_nickname())
-        self.data['partner_used_id'].append(self.get_partner_used_id())
-        self.data['active_user_id'].append(self.get_partner_user_nickname())
-        self.data['timestamp'].append(self.get_timestamp())
-        self.data['message_type'].append(self.get_message_type())
-        self.data['symbols_count'].append(self.get_symbols_count())
-        self.data['picture_count'].append(self.get_picture_count())
-        self.data['emoji_count'].append(self.get_emoji_count())
-        self.data['link_count'].append(self.get_link_count())
-        self.data['video_count'].append(self.get_video_count())
-        self.data['seconds_count'].append(self.get_seconds_count())
+        if not self.need_process_message() or self.time_border > self.get_timestamp():
+            return
+        self.update_aggregated_chat_info()
+        if self.need_append_message:
+            self.data['partner_user_nickname'].append(self.get_partner_user_nickname())
+            self.data['partner_used_id'].append(self.get_partner_user_id())
+            self.data['active_user_id'].append(self.get_partner_user_nickname())
+            self.data['timestamp'].append(self.get_timestamp())
+            self.data['message_type'].append(self.get_message_type())
+            self.data['symbols_count'].append(self.get_symbols_count())
+            self.data['picture_count'].append(self.get_picture_count())
+            self.data['emoji_count'].append(self.get_emoji_count())
+            self.data['link_count'].append(self.get_link_count())
+            self.data['video_count'].append(self.get_video_count())
+            self.data['seconds_count'].append(self.get_seconds_count())
 
     @abstractmethod
-    def update_aggregated_chat_info(self, message):
+    def update_aggregated_chat_info(self):
         pass
 
     def get_aggregated_chat_info(self):
@@ -65,7 +56,7 @@ class MessageProcessor(ABC):
         pass
 
     @abstractmethod
-    def get_partner_used_id(self):
+    def get_partner_user_id(self):
         pass
 
     @abstractmethod
@@ -100,18 +91,26 @@ class MessageProcessor(ABC):
     def get_seconds_count(self):
         pass
 
+    @abstractmethod
+    def need_process_message(self):
+        return True
+
 
 class TelegramMessageProcessor(MessageProcessor):
+    def __init__(self, user_id_mapper):
+        super().__init__(user_id_mapper)
+        self.prev_date_unixtime = 0
+
     def get_timestamp(self):
-        return self.message['date_unixtime']
+        return int(self.message['date_unixtime'])
 
     def get_message_type(self):
-        if len(self.message.get('text', '')) > 0:
-            return MessageType.MESSAGE
-        elif self.message.get('media_file', '') == 'video_file':
+        if self.message.get('media_type', '') == 'voice_message':
+            return MessageType.CALL_VOICE
+        elif self.message.get('media_type', '') == 'video_message':
             return MessageType.MESSAGE_VIDEO
         else:
-            raise Exception(str(self.message))
+            return MessageType.MESSAGE
 
     def get_symbols_count(self):
         return len(self.message.get('text', ''))
@@ -129,28 +128,38 @@ class TelegramMessageProcessor(MessageProcessor):
         return len(links)
 
     def get_seconds_count(self):
-        pass
+        return self.message.get('duration_seconds', 0)
 
     def get_video_count(self):
-        pass
+        return 1 if self.message.get('media_file', '') == 'video_file' else 0
 
-    def update_aggregated_chat_info(self, message):
-        pass
-
-    def process(self, message):
-        pass
+    def update_aggregated_chat_info(self):
+        if self.message["date_unixtime"] == self.prev_date_unixtime and self.get_message_type() == \
+                self.data['message_type'][-1]:
+            self.need_append_message = False
+            self.data['picture_count'][-1] += self.get_picture_count()
+            self.data['video_count'][-1] += self.get_video_count()
+            self.data['seconds_count'][-1] += self.get_seconds_count()
+        else:
+            self.need_append_message = True
+            self.prev_date_unixtime = self.get_timestamp()
 
     def get_target_used_id(self):
-        pass
+        for value in self.user_id_mapper.values():
+            return value
+
+    def get_partner_user_id(self):
+        from_id = int(self.message['from_id'][4:])
+        return self.user_id_mapper.get(from_id, from_id)
 
     def get_partner_user_nickname(self):
-        pass
-
-    def get_partner_used_id(self):
-        pass
+        return self.message['from']
 
     def start(self):
         return
+
+    def need_process_message(self):
+        return self.message['type'] == 'message' and self.message.get('forwarded_from', DEFAULT_VALUE) == DEFAULT_VALUE
 
     def parse(self):
         parsed_json = json.loads(self.data)

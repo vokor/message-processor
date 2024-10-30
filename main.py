@@ -4,7 +4,7 @@ from tkinter import filedialog
 from tkinter import font
 
 from utils import catch_command_errors, read_file
-# from processors import Platform, TelegramProcessor, WhatsappProcessor
+from processors import Platform, TelegramProcessor
 
 # def get_processor(platform, data):
 #     if platform == Platform.TELEGRAM:
@@ -81,10 +81,8 @@ from utils import catch_command_errors, read_file
 
 
 data = read_file("/home/vladimir/Git/message-processor/result.json")
-parsed_json = json.loads(data)
-print("ff")
-# processor = TelegramProcessor(data)
-# chats = processor.parse()
+processor = TelegramProcessor(data, 1)
+processor.run()
 
 
 
