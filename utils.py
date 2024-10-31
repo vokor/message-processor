@@ -10,10 +10,11 @@ class Platform:
 
 class MessageType:
     MESSAGE = "0"
-    MESSAGE_VIDEO = "1"
-    CALL_VOICE = "2"
-    CALL_VIDEO = "3"
-    CALL_UNDEFINED = "4"
+    MESSAGE_VIDEO = "1" # кружочек
+    MESSAGE_VOICE = "2" # голосовое
+    CALL_VIDEO = "3" # видеозвонок
+    CALL_AUDIO = "4"  # аудиозвонок
+    CALL_UNDEFINED = "5"
 
 PLATFORM_TO_ID = {
     Platform.TELEGRAM: 1,
