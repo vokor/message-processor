@@ -11,6 +11,7 @@ class Processor(ABC):
         self.context = {
             'name': name
         }
+        self.processed = pd.DataFrame()
 
     @abstractmethod
     def parse(self):
@@ -25,7 +26,7 @@ class Processor(ABC):
             self.message_processor = self.start_process_chat(chat, self.user_id_mapper)
             for message in chat['messages']:
                 self.message_processor.process(message)
-            self.finish_process_chat()
+            self.processed = pd.concat([self.finish_process_chat(), self.processed], ignore_index=True)
 
     @abstractmethod
     def start_process_chat(self, chat):
@@ -60,11 +61,18 @@ class TelegramProcessor(Processor):
             'chat_id': chat['id'],
             'chat_users_count': 2 if chat.get('type', DEFAULT_VALUE) == 'personal_chat' else -1,
         }
-        self.chat_info['partner_used_id'] = chat['id'] if self.chat_info['chat_users_count'] == 2 else DEFAULT_VALUE_NUM
+        if self.chat_info['chat_users_count'] == 2:
+            self.chat_info['partner_used_id'] = chat['id']
+            self.chat_info['partner_user_nickname'] = chat['name']
+        else:
+            self.chat_info['partner_used_id'] = DEFAULT_VALUE_NUM
+            self.chat_info['partner_user_nickname'] = DEFAULT_VALUE
         return TelegramMessageProcessor(user_id_mapper)
 
     def finish_process_chat(self):
         messages = self.message_processor.data
+        if len(messages) == 0:
+            return pd.DataFrame()
         if self.chat_info['chat_users_count'] == -1:
             self.chat_info['chat_users_count'] = len(set(messages['active_user_id']))
         data = {key: [value] * len(next(iter(messages.values()))) for key, value in self.chat_info.items()}
