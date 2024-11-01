@@ -1,4 +1,3 @@
-import json
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import font
