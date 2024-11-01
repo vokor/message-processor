@@ -113,7 +113,6 @@ class Application(tk.Frame):
             self.processor.processed.to_csv(file_path, index=False)
             self.log.insert(tk.END, f"File saved at {file_path}\n")
 
-
 root = tk.Tk()
 root.title("Message processor")
 app = Application(master=root)
