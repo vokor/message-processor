@@ -25,7 +25,7 @@ class MessageProcessor(ABC):
 
     def process(self, message):
         self.message = message
-        if self.get_timestamp() == 1683203434:
+        if self.get_timestamp() == 1682107548:
             a = 1
         if not self.need_process_message() or self.time_border > self.get_timestamp():
             return
@@ -142,7 +142,7 @@ class TelegramMessageProcessor(MessageProcessor):
         return self.message.get('duration_seconds', 0)
 
     def get_video_count(self):
-        return 1 if self.message.get('media_file', '') == 'video_file' else 0
+        return 1 if self.message.get('media_type', '') == 'video_file' else 0
 
     def count_aggregates(self):
         def count_links(text):
