@@ -25,7 +25,7 @@ class MessageProcessor(ABC):
 
     def process(self, message):
         self.message = message
-        if self.get_timestamp() == 1681841300:
+        if self.get_timestamp() == 1683203434:
             a = 1
         if not self.need_process_message() or self.time_border > self.get_timestamp():
             return
