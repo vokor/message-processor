@@ -43,6 +43,7 @@ def catch_command_errors(command_name):
                 self.download_button.config(state=tk.DISABLED)
                 self.upload_button.config(state=tk.DISABLED)
                 self.selector.config(state=tk.DISABLED)
+                self.user_id_entry.config(state=tk.DISABLED)
                 self.log.configure(state='disabled')
             if ok:
                 self.log.insert(tk.END, f"{command_name}: OK\n\n")
