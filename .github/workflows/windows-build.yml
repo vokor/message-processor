@@ -30,11 +30,15 @@ jobs:
        - name: Build executable
          run: pyinstaller --onefile main.py --add-data "C:\\hostedtoolcache\\windows\\Python\\3.9.13\\x64\\Lib\\site-packages\\emoji\\unicode_codes\\emoji.json;emoji/unicode_codes"
 
+       - name: Generate release tag
+         id: tag
+         run: |
+           echo "::set-output name=release_tag::UserBuild_$(date +"%Y.%m.%d_%H-%M")"
+
        - name: Create Release Tag
-         id: create_tag
          shell: pwsh
          run: |
-           $version = "$(Get-Date -Format 'yyyy.MM.dd').$env:GITHUB_RUN_NUMBER"
+           $version = "${{ steps.tag.outputs.release_tag }}"
            git config --global user.name "github-actions"
            git config --global user.email "actions@github.com"
            git tag $version
@@ -44,8 +48,8 @@ jobs:
 
        - name: Upload Release Asset
          uses: softprops/action-gh-release@v1
-         with:
-           files: dist/main.exe
-           tag_name: ${{ steps.create_tag.outputs.tag }}
          env:
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+         with:
+           tag_name: ${{ steps.tag.outputs.release_tag }}
+           files: dist/main.exe
