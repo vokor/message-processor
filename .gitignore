@@ -5,5 +5,5 @@ processed.csv
 dist
 .ipynb_checkpoints
 build
-.json
-.csv
+*.json
+*.csv

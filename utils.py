@@ -53,5 +53,5 @@ def catch_command_errors(command_name):
 
 
 def read_file(filename):
-    with open(filename, "r") as f:
+    with open(filename, "r", encoding="utf-8") as f:
         return f.read()
