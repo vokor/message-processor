@@ -55,3 +55,7 @@ def catch_command_errors(command_name):
 def read_file(filename):
     with open(filename, "r") as f:
         return f.read()
+
+def read_html_file(filename):
+    with open(filename, 'r', encoding='windows-1251') as file:
+        return file.read()
