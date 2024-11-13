@@ -19,6 +19,7 @@ class Processor(ABC):
             for message in chat['messages']:
                 self.message_processor.process(message)
             self.processed = pd.concat([self.finish_process_chat(), self.processed], ignore_index=True)
+            chat['messages'] = []
 
     @abstractmethod
     def start_process_chat(self, chat, user_id_mapper):

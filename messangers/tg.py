@@ -118,10 +118,6 @@ class TelegramMessageProcessor(MessageProcessor):
     def get_is_forwarded(self):
         return self.message.get('forwarded_from', DEFAULT_VALUE) != DEFAULT_VALUE
 
-    def parse(self):
-        parsed_json = json.loads(self.data)
-        print(len(parsed_json['chats']))
-
 
 class TelegramProcessor(Processor):
     def __init__(self, data, custom_target_user_id):

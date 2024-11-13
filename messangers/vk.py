@@ -1,10 +1,154 @@
 import glob
 import os
 import re
+from datetime import datetime
 
+import locale
+import emoji
+import pandas as pd
+
+from data_extractor import MessageProcessor
 from processors import Processor
-from utils import Platform, read_html_file
+from utils import Platform, read_html_file, DEFAULT_TARGET_USER_NAME, MessageType, DEFAULT_VALUE_NUM, DEFAULT_VALUE
 from bs4 import BeautifulSoup
+
+
+
+class VkMessageProcessor(MessageProcessor):
+    def __init__(self, user_id_mapper):
+        self.OK = False
+        super().__init__(user_id_mapper)
+        self.prev_date_unixtime = 0
+
+    def get_timestamp(self):
+        pattern = r'\d{1,2} [а-яё]{3} \d{4} в \d{1,2}:\d{2}:\d{2}'
+        header = self.message.find('div', class_='message__header').text
+        if "Вы, 11 окт 2024 в 13:47:58" in header:
+            a = 1
+            self.OK = True
+        date_str = header.split(', ')[-1]
+        match = re.search(pattern, date_str)
+        if match:
+            date_part = match.group()
+            locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
+            dt = datetime.strptime(date_part, "%d %b %Y в %H:%M:%S")
+            t = int(dt.timestamp())
+            return t
+        else:
+            raise Exception("Error: couldn't parse date from: " + header)
+
+    def check_if_call(self):
+        attachment_description = self.message.find('div', class_='attachment__description')
+        if attachment_description and 'Звонок' in attachment_description.text:
+            return True
+        return False
+
+    def check_if_video(self):
+        attachment_description = self.message.find('div', class_='attachment__description')
+        if attachment_description and 'Видеозапись' in attachment_description.text:
+            return True
+        return False
+
+    def check_if_voice(self):
+        attachment_link = self.message.find('a', class_='attachment__link')
+        if attachment_link and attachment_link['href'].endswith('.ogg'):
+            return True
+        return False
+
+    def get_message_type(self):
+        if self.check_if_voice():
+            return MessageType.MESSAGE_VOICE
+        elif self.check_if_video():
+            return MessageType.MESSAGE_VIDEO
+        elif self.check_if_call():
+            return MessageType.CALL_AUDIO
+        else:
+            return MessageType.MESSAGE
+
+    def get_symbols_count(self):
+        return self.message_structure['symbols_count']
+
+    def get_picture_count(self):
+        return 1 if len(self.message.get('photo', '')) > 0 else 0
+
+    def get_emoji_count(self):
+        return self.message_structure['emoji_count']
+
+    def get_link_count(self):
+        return self.message_structure['links_count']
+
+    def get_seconds_count(self):
+        return DEFAULT_VALUE_NUM
+
+    def get_video_count(self):
+        return 1 if self.check_if_video() else 0
+
+    def get_message_text(self):
+        content_div = self.message.find_all('div')[-2]
+        if content_div is None:
+            return ""
+        text_parts = [element for element in content_div.contents if element.name != 'div']
+        message_text = ''.join(str(part) for part in text_parts).strip()
+        return BeautifulSoup(message_text, 'html.parser').text
+
+    def count_aggregates(self):
+        def count_links(text):
+            url_pattern = r'(https?://(?:www\.)?[^\s]+)'
+            links = re.findall(url_pattern, text)
+            return len(links)
+
+        def count_symbols(text):
+            return len(text)
+
+        def count_emoji(text):
+            emoji_list = [char for char in text if char in emoji.EMOJI_DATA]
+            return len(emoji_list)
+
+        message_text = self.get_message_text()
+        return {
+            "symbols_count": count_symbols(message_text),
+            "links_count": count_links(message_text),
+            "emoji_count": count_emoji(message_text) + count_emoji(self.message.get('sticker_emoji', ''))
+        }
+
+    def update_aggregated_chat_info(self):
+        self.message_structure = self.count_aggregates()
+        if self.get_timestamp() == self.prev_date_unixtime and self.get_message_type() == self.data['message_type'][-1]:
+            self.need_append_message = False
+            self.data['picture_count'][-1] += self.get_picture_count()
+            self.data['video_count'][-1] += self.get_video_count()
+            self.data['seconds_count'][-1] += self.get_seconds_count()
+        else:
+            self.need_append_message = True
+            self.prev_date_unixtime = self.get_timestamp()
+
+    def get_target_used_id(self):
+        return self.user_id_mapper
+
+    def get_active_user_id(self):
+        header = self.message.find('div', class_='message__header')
+        if header.find('a'):
+            href = header.find('a')['href']
+            return int(re.split('id|public|club', href)[-1])
+        else:
+            return self.get_target_used_id()
+
+    def get_active_user_nickname(self):
+        header = self.message.find('div', class_='message__header')
+        if header.find('a'):
+            return header.find('a').text
+        else:
+            return DEFAULT_TARGET_USER_NAME
+
+    def start(self):
+        return
+
+    def need_process_message(self):
+        return True
+
+    def get_is_forwarded(self):
+        return self.message.get('forwarded_from', DEFAULT_VALUE) != DEFAULT_VALUE
+
 
 class VkProcessor(Processor):
     def __init__(self, data, custom_target_user_id):
@@ -38,14 +182,25 @@ class VkProcessor(Processor):
                 return int(match.group(1))
             return float('inf')
 
+        self.chat_info = {
+            'chat_id': int(chat['id']),
+        }
+
         chat_folder_path = self.data + '/messages/' + chat['id']
         if chat['id'] == '240400996':
             chat_paths = glob.glob(os.path.join(chat_folder_path, '*.html'))
             for path in sorted(chat_paths, key=extract_number_from_filename):
                 file_data = read_html_file(path)
                 soup = BeautifulSoup(file_data, 'html.parser')
-                chat['messages'] = soup.find_all('div', class_='message')
-                a = 1
+                chat['messages'].extend(soup.find_all('div', class_='message'))
+        return VkMessageProcessor(user_id_mapper)
 
     def finish_process_chat(self):
-        pass
+        messages = self.message_processor.data
+        if len(messages) == 0:
+            return pd.DataFrame()
+        # if self.chat_info['chat_users_count'] == -1:
+        #     self.chat_info['chat_users_count'] = len(set(messages['active_user_id']))
+        data = {key: [value] * len(next(iter(messages.values()))) for key, value in self.chat_info.items()}
+        data.update(messages)
+        return pd.DataFrame(data)
