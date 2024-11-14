@@ -23,7 +23,7 @@ class VkMessageProcessor(MessageProcessor):
     def get_timestamp(self):
         pattern = r'\d{1,2} [а-яё]{3} \d{4} в \d{1,2}:\d{2}:\d{2}'
         header = self.message.find('div', class_='message__header').text
-        if "Вы, 11 окт 2024 в 13:47:58" in header:
+        if "Вы, 29 апр 2022 в 20:31:32" in header:
             a = 1
             self.OK = True
         date_str = header.split(', ')[-1]
@@ -44,10 +44,12 @@ class VkMessageProcessor(MessageProcessor):
         return False
 
     def check_if_video(self):
-        attachment_description = self.message.find('div', class_='attachment__description')
-        if attachment_description and 'Видеозапись' in attachment_description.text:
-            return True
-        return False
+        image_count = 0
+        attachment_descriptions = self.message.find_all('div', class_='attachment__description')
+        for description in attachment_descriptions:
+            if 'Видеозапись' in description.text:
+                image_count += 1
+        return image_count
 
     def check_if_voice(self):
         attachment_link = self.message.find('a', class_='attachment__link')
@@ -69,7 +71,12 @@ class VkMessageProcessor(MessageProcessor):
         return self.message_structure['symbols_count']
 
     def get_picture_count(self):
-        return 1 if len(self.message.get('photo', '')) > 0 else 0
+        image_count = 0
+        attachment_descriptions = self.message.find_all('div', class_='attachment__description')
+        for description in attachment_descriptions:
+            if 'Фотография' in description.text:
+                image_count += 1
+        return image_count
 
     def get_emoji_count(self):
         return self.message_structure['emoji_count']
@@ -84,12 +91,11 @@ class VkMessageProcessor(MessageProcessor):
         return 1 if self.check_if_video() else 0
 
     def get_message_text(self):
-        content_div = self.message.find_all('div')[-2]
-        if content_div is None:
-            return ""
-        text_parts = [element for element in content_div.contents if element.name != 'div']
+        header_div = self.message.find('div', class_='message__header')
+        message_text_div = header_div.find_next_sibling('div')
+        text_parts = [element for element in message_text_div.contents if element.name != 'div']
         message_text = ''.join(str(part) for part in text_parts).strip()
-        return BeautifulSoup(message_text, 'html.parser').text
+        return message_text
 
     def count_aggregates(self):
         def count_links(text):
@@ -147,12 +153,15 @@ class VkMessageProcessor(MessageProcessor):
         return True
 
     def get_is_forwarded(self):
-        return self.message.get('forwarded_from', DEFAULT_VALUE) != DEFAULT_VALUE
+        attachment_description = self.message.find('div', class_='attachment__description')
+        if attachment_description and 'прикреплён' in attachment_description.text:
+            return True
+        return False
 
 
 class VkProcessor(Processor):
-    def __init__(self, data, custom_target_user_id):
-        super().__init__(Platform.VK, custom_target_user_id)
+    def __init__(self, data, custom_target_user_id, update_progress):
+        super().__init__(Platform.VK, custom_target_user_id, update_progress)
         self.data = data
 
     def parse_index(self):
@@ -185,22 +194,20 @@ class VkProcessor(Processor):
         self.chat_info = {
             'chat_id': int(chat['id']),
         }
-
         chat_folder_path = self.data + '/messages/' + chat['id']
-        if chat['id'] == '240400996':
-            chat_paths = glob.glob(os.path.join(chat_folder_path, '*.html'))
-            for path in sorted(chat_paths, key=extract_number_from_filename):
-                file_data = read_html_file(path)
-                soup = BeautifulSoup(file_data, 'html.parser')
-                chat['messages'].extend(soup.find_all('div', class_='message'))
+        #if chat['id'] == '2000000151':#'240400996':
+        chat_paths = glob.glob(os.path.join(chat_folder_path, '*.html'))
+        for path in sorted(chat_paths, key=extract_number_from_filename):
+            file_data = read_html_file(path)
+            soup = BeautifulSoup(file_data, 'html.parser')
+            chat['messages'].extend(soup.find_all('div', class_='message'))
         return VkMessageProcessor(user_id_mapper)
 
     def finish_process_chat(self):
         messages = self.message_processor.data
         if len(messages) == 0:
             return pd.DataFrame()
-        # if self.chat_info['chat_users_count'] == -1:
-        #     self.chat_info['chat_users_count'] = len(set(messages['active_user_id']))
+        self.chat_info['chat_users_count'] = len(set(messages['active_user_id']))
         data = {key: [value] * len(next(iter(messages.values()))) for key, value in self.chat_info.items()}
         data.update(messages)
         return pd.DataFrame(data)

@@ -120,8 +120,8 @@ class TelegramMessageProcessor(MessageProcessor):
 
 
 class TelegramProcessor(Processor):
-    def __init__(self, data, custom_target_user_id):
-        super().__init__(Platform.TELEGRAM, custom_target_user_id)
+    def __init__(self, data, custom_target_user_id, update_progress):
+        super().__init__(Platform.TELEGRAM, custom_target_user_id, update_progress)
         self.data = data
 
     def parse(self):
