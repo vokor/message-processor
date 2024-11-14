@@ -72,18 +72,25 @@ jobs:
           pip install pyinstaller
           pip install -r requirements.txt
 
+      - name: Debug - List Files
+        run: |
+          echo "Current Directory:"
+          pwd
+          echo "Files in Current Directory:"
+          ls -R
+
       - name: Build Linux executable
         run: pyinstaller --onefile main.py --add-data "emoji/unicode_codes/emoji.json:emoji/unicode_codes"
 
       - name: Generate release tag for Linux
         id: tag-linux
         run: |
-          echo "::set-output name=release_tag::Linux_$(date +"%Y.%m.%d_%H-%M")"
+          echo "release_tag=Linux_$(date +"%Y.%m.%d_%H-%M")" >> $GITHUB_ENV
 
       - name: Create Release Tag for Linux
         shell: bash
         run: |
-          version=${{ steps.tag-linux.outputs.release_tag }}
+          version=${{ env.release_tag }}
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
           git tag $version
@@ -96,7 +103,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.tag-linux.outputs.release_tag }}
+          tag_name: ${{ env.release_tag }}
           files: dist/main
 
   build-mac:
