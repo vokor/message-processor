@@ -191,16 +191,20 @@ class VkProcessor(Processor):
                 return int(match.group(1))
             return float('inf')
 
+        def message_generator(chat_folder_path):
+            chat_paths = glob.glob(os.path.join(chat_folder_path, '*.html'))
+            for path in sorted(chat_paths, key=extract_number_from_filename):
+                file_data = read_html_file(path)
+                soup = BeautifulSoup(file_data, 'html.parser')
+                for message in soup.find_all('div', class_='message'):
+                    yield message
+
         self.chat_info = {
             'chat_id': int(chat['id']),
         }
         chat_folder_path = self.data + '/messages/' + chat['id']
         #if chat['id'] == '2000000151':#'240400996':
-        chat_paths = glob.glob(os.path.join(chat_folder_path, '*.html'))
-        for path in sorted(chat_paths, key=extract_number_from_filename):
-            file_data = read_html_file(path)
-            soup = BeautifulSoup(file_data, 'html.parser')
-            chat['messages'].extend(soup.find_all('div', class_='message'))
+        chat['messages'] = message_generator(chat_folder_path)
         return VkMessageProcessor(user_id_mapper)
 
     def finish_process_chat(self):
