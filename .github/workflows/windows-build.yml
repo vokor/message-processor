@@ -72,15 +72,17 @@ jobs:
           pip install pyinstaller
           pip install -r requirements.txt
 
-      - name: Debug - List Files
+      - name: Locate emoji.json
+        id: locate-emoji
         run: |
-          echo "Current Directory:"
-          pwd
-          echo "Files in Current Directory:"
-          ls -R
+          echo "Finding emoji.json path..."
+          EMOJI_JSON_PATH=$(python -c "import os; import emoji; print(os.path.join(emoji.__path__[0], 'unicode_codes', 'emoji.json'))")
+          echo "Found emoji.json at: $EMOJI_JSON_PATH"
+          echo "emoji_json_path=$EMOJI_JSON_PATH" >> $GITHUB_ENV
 
       - name: Build Linux executable
-        run: pyinstaller --onefile main.py --add-data "emoji/unicode_codes/emoji.json:emoji/unicode_codes"
+        run: |
+          pyinstaller --onefile main.py --add-data "${{ env.emoji_json_path }}:emoji/unicode_codes"
 
       - name: Generate release tag for Linux
         id: tag-linux
