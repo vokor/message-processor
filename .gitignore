@@ -1,9 +1,9 @@
 venv
 __pycache__
 .idea
-processed.csv
 dist
 .ipynb_checkpoints
 build
 *.json
 *.csv
+data

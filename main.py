@@ -1,21 +1,33 @@
+import platform
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import ttk
+from tkinter import filedialog, messagebox
 from tkinter import font
 
-from utils import catch_command_errors, read_file
-from processors import Platform, TelegramProcessor
+from messangers.tg import TelegramProcessor
+from messangers.vk import VkProcessor
+from utils import catch_command_errors, read_file, Platform, read_html_file
 
 
-def get_processor(platform, data, user_id):
+def get_processor(platform, data, user_id, update_progress):
     if platform == Platform.TELEGRAM:
-        return TelegramProcessor(data, int(user_id))
+        return TelegramProcessor(data, int(user_id), update_progress)
     elif platform == Platform.WHATSAPP:
         raise Exception("Not implemented")
     elif platform == Platform.VK:
-        raise Exception("Not implemented")
+        return VkProcessor(data, int(user_id), update_progress)
     else:
         raise Exception(f"Unknown platform: {platform}\n")
 
+def get_reader(platform):
+    if platform == Platform.TELEGRAM:
+        return read_file
+    elif platform == Platform.WHATSAPP:
+        raise Exception("Not implemented")
+    elif platform == Platform.VK:
+        return lambda x: x
+    else:
+        raise Exception(f"Unknown platform: {platform}\n")
 
 class Application(tk.Frame):
     def __init__(self, master=None):
@@ -27,6 +39,17 @@ class Application(tk.Frame):
         self.create_widgets()
         self.is_uploaded = False
         self.is_user_id_set = False
+        os_type = platform.system()
+        if os_type == "Windows":
+            self.log.insert(tk.END, "Running on Windows\n")
+        elif os_type == "Darwin":
+            self.log.insert(tk.END, "Running on macOS\n")
+        elif os_type == "Linux":
+            self.log.insert(tk.END, "Running on Linux\n")
+
+    def update_progress(self, value):
+        self.progress['value'] = value
+        self.update_idletasks()
 
     def create_widgets(self):
         self.selector_label = tk.Label(self, text="Мессенджер: ", font=self.font)
@@ -43,7 +66,7 @@ class Application(tk.Frame):
         self.user_id_var = tk.StringVar()
         self.user_id_var.trace_add('write', self.on_user_id_change)
 
-        self.id_label = tk.Label(self, text="User ID: ", font=self.font)
+        self.id_label = tk.Label(self, text="  ID: ", font=self.font)
         self.id_label.grid(row=1, column=0, sticky="E")
 
         self.user_id_entry = tk.Entry(self, textvariable=self.user_id_var, font=self.font)
@@ -57,6 +80,9 @@ class Application(tk.Frame):
                                         height=3, width=20)
         self.process_button.grid(row=2, column=0)
 
+        self.progress = ttk.Progressbar(self, orient='horizontal', length=400, mode='determinate')
+        self.progress.grid(row=2, column=1, sticky='W', padx=10, pady=5)
+
         self.log = tk.Text(self, height=20, width=100, font=self.font)
         self.log.grid(row=3, column=0, columnspan=2)
 
@@ -66,8 +92,11 @@ class Application(tk.Frame):
 
     @catch_command_errors("upload_file")
     def upload_file(self):
-        filename = filedialog.askopenfilename()
-        self.data = read_file(filename)
+        if self.var.get() == Platform.VK:
+            filename = filedialog.askdirectory()
+        else:
+            filename = filedialog.askopenfilename()
+        self.data = get_reader(self.var.get())(filename)
         self.download_button.config(state=tk.DISABLED)
         self.is_uploaded = True
         if self.is_uploaded and self.is_user_id_set:
@@ -99,7 +128,7 @@ class Application(tk.Frame):
             return
         self.log.insert(tk.END, f"Processing for platform: {platform} with User ID: {user_id}\n")
         self.download_button.config(state="normal")
-        self.processor = get_processor(platform, self.data, user_id)
+        self.processor = get_processor(platform, self.data, user_id, self.update_progress)
         self.processor.run()
 
     @catch_command_errors("download")
@@ -119,5 +148,10 @@ app.mainloop()
 
 # data = read_file("/home/vladimir/Git/message-processor/result.json")
 # processor = TelegramProcessor(data, 1)
+# processor.run()
+# processor.processed.to_csv('processed.csv', index=False)
+
+# data = "/home/vladimir/Git/message-processor/data/vk"
+# processor = VkProcessor(data, 1)
 # processor.run()
 # processor.processed.to_csv('processed.csv', index=False)
