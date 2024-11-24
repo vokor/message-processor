@@ -17,10 +17,13 @@ from bs4 import BeautifulSoup
 class VkMessageProcessor(MessageProcessor):
     def __init__(self, user_id_mapper):
         self.OK = False
+        self.time = None
         super().__init__(user_id_mapper)
         self.prev_date_unixtime = 0
 
     def get_timestamp(self):
+        if self.time is not None:
+            return self.time
         pattern = r'\d{1,2} [а-яё]{3} \d{4} в \d{1,2}:\d{2}:\d{2}'
         header = self.message.find('div', class_='message__header').text
         if "Вы, 29 апр 2022 в 20:31:32" in header:
@@ -33,6 +36,7 @@ class VkMessageProcessor(MessageProcessor):
             locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
             dt = datetime.strptime(date_part, "%d %b %Y в %H:%M:%S")
             t = int(dt.timestamp())
+            self.time = t
             return t
         else:
             raise Exception("Error: couldn't parse date from: " + header)
