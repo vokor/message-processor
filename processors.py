@@ -20,6 +20,7 @@ class Processor(ABC):
         for chat in chats:
             self.message_processor = self.start_process_chat(chat, self.user_id_mapper)
             for message in chat['messages']:
+                self.message_processor.time = None
                 self.message_processor.process(message)
             self.processed = pd.concat([self.finish_process_chat(), self.processed], ignore_index=True)
             processed_num += 1
