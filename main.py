@@ -6,6 +6,7 @@ from tkinter import font
 
 from messangers.tg import TelegramProcessor
 from messangers.vk import VkProcessor
+from messangers.whatsapp import WhatsappProcessor
 from utils import catch_command_errors, read_file, Platform, read_html_file
 
 
@@ -13,7 +14,7 @@ def get_processor(platform, data, user_id, update_progress):
     if platform == Platform.TELEGRAM:
         return TelegramProcessor(data, int(user_id), update_progress)
     elif platform == Platform.WHATSAPP:
-        raise Exception("Not implemented")
+        return WhatsappProcessor(data, int(user_id), update_progress)
     elif platform == Platform.VK:
         return VkProcessor(data, int(user_id), update_progress)
     else:
@@ -23,7 +24,7 @@ def get_reader(platform):
     if platform == Platform.TELEGRAM:
         return read_file
     elif platform == Platform.WHATSAPP:
-        raise Exception("Not implemented")
+        return lambda x: x
     elif platform == Platform.VK:
         return lambda x: x
     else:
@@ -92,7 +93,7 @@ class Application(tk.Frame):
 
     @catch_command_errors("upload_file")
     def upload_file(self):
-        if self.var.get() == Platform.VK:
+        if self.var.get() == Platform.VK or self.var.get() == Platform.WHATSAPP:
             filename = filedialog.askdirectory()
         else:
             filename = filedialog.askopenfilename()
@@ -153,5 +154,10 @@ app.mainloop()
 
 # data = "/home/vladimir/Git/message-processor/data/vk"
 # processor = VkProcessor(data, 1)
+# processor.run()
+# processor.processed.to_csv('processed.csv', index=False)
+
+# data = "/home/vladimir/Git/message-processor/data/whatsapp"
+# processor = WhatsappProcessor(data, 1, lambda x: x)
 # processor.run()
 # processor.processed.to_csv('processed.csv', index=False)
