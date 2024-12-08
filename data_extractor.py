@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from utils import PLATFORM_TO_ID
 
+MESSAGES_COUNT_TO_CONTINUE = 5000
 
 class MessageProcessor(ABC):
     def __init__(self, user_id_mapper):
@@ -12,6 +13,9 @@ class MessageProcessor(ABC):
         self.need_append_message = True
         self.time_border = int((datetime.now() - timedelta(days=5 * 365)).timestamp())
         self.user_id_mapper = user_id_mapper
+        self.continue_processing = True
+        self.count_target_user_messages = 0
+        self.count_all_messages = 0
 
     def get_or_else(self, one, another):
         if one in self.message:
@@ -38,6 +42,12 @@ class MessageProcessor(ABC):
             self.data['video_count'].append(self.get_video_count())
             self.data['seconds_count'].append(self.get_seconds_count())
             self.data['is_forwarded'].append(self.get_is_forwarded())
+            if self.data['active_user_id'] == self.get_target_used_id():
+                self.count_target_user_messages += 1
+            self.count_all_messages += 1
+        if self.count_all_messages > MESSAGES_COUNT_TO_CONTINUE and self.count_target_user_messages == 0:
+            self.continue_processing = False
+
 
     @abstractmethod
     def update_aggregated_chat_info(self):

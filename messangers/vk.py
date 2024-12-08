@@ -33,7 +33,10 @@ class VkMessageProcessor(MessageProcessor):
         match = re.search(pattern, date_str)
         if match:
             date_part = match.group()
-            locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
+            try:
+                locale.setlocale(locale.LC_TIME, 'russian')
+            except locale.Error:
+                locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
             dt = datetime.strptime(date_part, "%d %b %Y в %H:%M:%S")
             t = int(dt.timestamp())
             self.time = t
@@ -197,7 +200,7 @@ class VkProcessor(Processor):
 
         def message_generator(chat_folder_path):
             chat_paths = glob.glob(os.path.join(chat_folder_path, '*.html'))
-            for path in sorted(chat_paths, key=extract_number_from_filename):
+            for path in sorted(chat_paths, key=extract_number_from_filename, reverse=True):
                 file_data = read_html_file(path)
                 soup = BeautifulSoup(file_data, 'html.parser')
                 for message in soup.find_all('div', class_='message'):

@@ -131,6 +131,7 @@ class Application(tk.Frame):
         self.download_button.config(state="normal")
         self.processor = get_processor(platform, self.data, user_id, self.update_progress)
         self.processor.run()
+        self.log.insert(tk.END, f"Processed chats: {self.processor.all_chats}, skipped chats: {self.processor.skipped_chats}, skipped chat ids: {self.processor.skipped_chat_ids}\n")
 
     @catch_command_errors("download")
     def download(self):
