@@ -105,6 +105,7 @@ class WhatsappMessageProcessor(MessageProcessor):
         }
 
     def update_aggregated_chat_info(self):
+        self.count_target_user_messages += 1
         self.message_structure = self.count_aggregates()
         if self.get_timestamp() == self.prev_date_unixtime and self.get_message_type() == self.data['message_type'][-1]:
             self.need_append_message = False
