@@ -3,7 +3,6 @@ import os
 import re
 from datetime import datetime
 
-import locale
 import emoji
 import pandas as pd
 
@@ -11,8 +10,6 @@ from data_extractor import MessageProcessor
 from processors import Processor
 from utils import Platform, read_html_file, DEFAULT_TARGET_USER_NAME, MessageType, DEFAULT_VALUE_NUM, DEFAULT_VALUE
 from bs4 import BeautifulSoup
-
-
 
 class VkMessageProcessor(MessageProcessor):
     def __init__(self, user_id_mapper):
@@ -24,25 +21,46 @@ class VkMessageProcessor(MessageProcessor):
     def get_timestamp(self):
         if self.time is not None:
             return self.time
-        pattern = r'\d{1,2} [а-яё]{3} \d{4} в \d{1,2}:\d{2}:\d{2}'
+
+        month_map = {
+            'янв': 'Jan',
+            'фев': 'Feb',
+            'мар': 'Mar',
+            'апр': 'Apr',
+            'май': 'May',
+            'мая': 'May',
+            'июн': 'Jun',
+            'июл': 'Jul',
+            'авг': 'Aug',
+            'сен': 'Sep',
+            'окт': 'Oct',
+            'ноя': 'Nov',
+            'дек': 'Dec'
+        }
+
+        pattern = r'\d{1,2} [а-яё]+ \d{4} в \d{1,2}:\d{2}:\d{2}'
         header = self.message.find('div', class_='message__header').text
-        if "Вы, 29 апр 2022 в 20:31:32" in header:
-            a = 1
-            self.OK = True
         date_str = header.split(', ')[-1]
         match = re.search(pattern, date_str)
+
         if match:
             date_part = match.group()
+
+            for ru_month, en_month in month_map.items():
+                if ru_month in date_part:
+                    date_part = date_part.replace(ru_month, en_month).replace(' в ', ' ')
+                    break
+
             try:
-                locale.setlocale(locale.LC_TIME, 'russian')
-            except locale.Error:
-                locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
-            dt = datetime.strptime(date_part, "%d %b %Y в %H:%M:%S")
-            t = int(dt.timestamp())
-            self.time = t
-            return t
+                dt = datetime.strptime(date_part, "%d %b %Y %H:%M:%S")
+                t = int(dt.timestamp())
+                self.time = t
+                return t
+            except ValueError:
+                raise Exception(f"Error: couldn't parse date: {date_part}")
         else:
-            raise Exception("Error: couldn't parse date from: " + header)
+            raise Exception(f"Error: couldn't match date pattern in: {header}")
+
 
     def check_if_call(self):
         attachment_description = self.message.find('div', class_='attachment__description')

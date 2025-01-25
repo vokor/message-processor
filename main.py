@@ -3,11 +3,25 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, messagebox
 from tkinter import font
+import os
+from math import log, pow
 
 from messangers.tg import TelegramProcessor
 from messangers.vk import VkProcessor
 from messangers.whatsapp import WhatsappProcessor
 from utils import catch_command_errors, read_file, Platform, read_html_file
+
+
+def convert_size(size_bytes):
+    if size_bytes == 0:
+        return "0B"
+
+    size_name = ("B", "KB", "MB", "GB", "TB", "PB")
+    i = int(min(len(size_name) - 1, (log(size_bytes, 1024))))  # Use math.log
+    p = pow(1024, i)  # Use math.pow
+    s = round(size_bytes / p, 2)
+
+    return f"{s} {size_name[i]}"
 
 
 def get_processor(platform, data, user_id, update_progress):
@@ -97,6 +111,8 @@ class Application(tk.Frame):
             filename = filedialog.askdirectory()
         else:
             filename = filedialog.askopenfilename()
+            self.log.insert(tk.END, f"Try upload: {filename}\n")
+            self.log.insert(tk.END, f"File size: {convert_size(os.path.getsize(filename))}\n")
         self.data = get_reader(self.var.get())(filename)
         self.download_button.config(state=tk.DISABLED)
         self.is_uploaded = True

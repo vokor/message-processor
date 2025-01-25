@@ -43,9 +43,11 @@ def catch_command_errors(command_name):
             try:
                 func(self, *args, **kwargs)
             except Exception as e:
+                import traceback
                 ok = False
                 self.log.insert(tk.END, f"Error while executing: {command_name}\n")
-                self.log.insert(tk.END, str(e))
+                self.log.insert(tk.END, f"{repr(e)}\n")
+                self.log.insert(tk.END, f"{traceback.format_exc()}\n")
                 self.process_button.config(state=tk.DISABLED)
                 self.download_button.config(state=tk.DISABLED)
                 self.upload_button.config(state=tk.DISABLED)
