@@ -16,6 +16,7 @@ class MessageProcessor(ABC):
         self.continue_processing = True
         self.count_target_user_messages = 0
         self.count_all_messages = 0
+        self.unique_active_user_id = set()
 
     def get_or_else(self, one, another):
         if one in self.message:
@@ -31,8 +32,9 @@ class MessageProcessor(ABC):
             return
         self.update_aggregated_chat_info()
         if self.need_append_message:
+            active_user_id = self.get_active_user_id()
             self.data['active_user_nickname'].append(self.get_active_user_nickname())
-            self.data['active_user_id'].append(self.get_active_user_id())
+            self.data['active_user_id'].append(active_user_id)
             self.data['timestamp'].append(self.get_timestamp())
             self.data['message_type'].append(self.get_message_type())
             self.data['symbols_count'].append(self.get_symbols_count())
@@ -45,7 +47,8 @@ class MessageProcessor(ABC):
             if self.data['active_user_id'] == self.get_target_used_id():
                 self.count_target_user_messages += 1
             self.count_all_messages += 1
-        if self.count_all_messages > MESSAGES_COUNT_TO_CONTINUE and self.count_target_user_messages == 0:
+            self.unique_active_user_id.add(active_user_id)
+        if (self.count_all_messages > MESSAGES_COUNT_TO_CONTINUE and self.count_target_user_messages == 0) or len(self.unique_active_user_id) >= 3:
             self.continue_processing = False
 
 

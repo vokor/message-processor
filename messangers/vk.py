@@ -206,7 +206,7 @@ class VkProcessor(Processor):
         return link_pairs
 
     def run(self):
-        self.user_id_mapper = 1
+        self.user_id_mapper = self.custom_target_user_id
         self.process_chats(self.parse_index())
 
     def start_process_chat(self, chat, user_id_mapper):
