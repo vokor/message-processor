@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from utils import PLATFORM_TO_ID
 
-MESSAGES_COUNT_TO_CONTINUE = 5000
+MESSAGES_COUNT_TO_CONTINUE = 3000
 
 class MessageProcessor(ABC):
     def __init__(self, user_id_mapper):
@@ -26,7 +26,7 @@ class MessageProcessor(ABC):
 
     def process(self, message):
         self.message = message
-        if self.get_timestamp() == 1728634725:
+        if self.get_timestamp() == 1636441021:
             a = 1
         if not self.need_process_message() or self.time_border > self.get_timestamp():
             return
@@ -44,7 +44,7 @@ class MessageProcessor(ABC):
             self.data['video_count'].append(self.get_video_count())
             self.data['seconds_count'].append(self.get_seconds_count())
             self.data['is_forwarded'].append(self.get_is_forwarded())
-            if self.data['active_user_id'] == self.get_target_used_id():
+            if active_user_id == self.get_target_used_id():
                 self.count_target_user_messages += 1
             self.count_all_messages += 1
             self.unique_active_user_id.add(active_user_id)

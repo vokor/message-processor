@@ -5,6 +5,7 @@ from tkinter import filedialog, messagebox
 from tkinter import font
 import os
 from math import log, pow
+import time
 
 from messangers.tg import TelegramProcessor
 from messangers.vk import VkProcessor
@@ -145,8 +146,14 @@ class Application(tk.Frame):
             return
         self.log.insert(tk.END, f"Processing for platform: {platform} with User ID: {user_id}\n")
         self.download_button.config(state="normal")
+        start_time = time.time()
         self.processor = get_processor(platform, self.data, user_id, self.update_progress)
         self.processor.run()
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        minutes = int(elapsed_time // 60)
+        seconds = int(elapsed_time % 60)
+        self.log.insert(tk.END, f"Execution time: {minutes} min {seconds} sec\n")
         self.log.insert(tk.END, f"Processed chats: {self.processor.all_chats}, skipped chats: {self.processor.skipped_chats}, skipped chat ids: {self.processor.skipped_chat_ids}\n")
 
     @catch_command_errors("download")
