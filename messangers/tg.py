@@ -138,7 +138,7 @@ class TelegramProcessor(Processor):
         self.user_id_mapper = {personal_info['user_id']: self.custom_target_user_id}
         self.process_chats(data['chats']['list'])
 
-    def start_process_chat(self, chat, user_id_mapper):
+    def start_process_chat(self, chat):
         self.chat_info = {
             'chat_id': chat['id'],
             'chat_users_count': 2 if chat.get('type', DEFAULT_VALUE) == 'personal_chat' else -1,
@@ -149,7 +149,7 @@ class TelegramProcessor(Processor):
         else:
             self.chat_info['partner_used_id'] = DEFAULT_VALUE_NUM
             self.chat_info['partner_user_nickname'] = DEFAULT_VALUE
-        return TelegramMessageProcessor(user_id_mapper)
+        return TelegramMessageProcessor(self.user_id_mapper)
 
     def finish_process_chat(self):
         messages = self.message_processor.data

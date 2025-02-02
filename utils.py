@@ -1,7 +1,7 @@
 import hashlib
 import tkinter as tk
 
-DEFAULT_VALUE = 'nan'
+DEFAULT_VALUE = ""
 DEFAULT_VALUE_NUM = -1
 DEFAULT_TARGET_USER_NAME = "Вы"
 

@@ -12,10 +12,11 @@ from utils import Platform, read_html_file, DEFAULT_TARGET_USER_NAME, MessageTyp
 from bs4 import BeautifulSoup
 
 class VkMessageProcessor(MessageProcessor):
-    def __init__(self, user_id_mapper):
+    def __init__(self, user_id_mapper, target_user_nickname):
         self.OK = False
         self.time = None
         super().__init__(user_id_mapper)
+        self.target_user_nickname = target_user_nickname
         self.prev_date_unixtime = 0
 
     def get_timestamp(self):
@@ -110,7 +111,7 @@ class VkMessageProcessor(MessageProcessor):
         return self.message_structure['links_count']
 
     def get_seconds_count(self):
-        return DEFAULT_VALUE_NUM
+        return 0
 
     def get_video_count(self):
         return 1 if self.check_if_video() else 0
@@ -169,7 +170,7 @@ class VkMessageProcessor(MessageProcessor):
         if header.find('a'):
             return header.find('a').text
         else:
-            return DEFAULT_TARGET_USER_NAME
+            return self.target_user_nickname
 
     def start(self):
         return
@@ -179,7 +180,7 @@ class VkMessageProcessor(MessageProcessor):
 
     def get_is_forwarded(self):
         attachment_description = self.message.find('div', class_='attachment__description')
-        if attachment_description and 'прикреплён' in attachment_description.text:
+        if attachment_description and ('прикреплён' in attachment_description.text or 'Запись на стене' in attachment_description.text):
             return True
         return False
 
@@ -188,6 +189,22 @@ class VkProcessor(Processor):
     def __init__(self, data, custom_target_user_id, update_progress):
         super().__init__(Platform.VK, custom_target_user_id, update_progress)
         self.data = data
+
+    def extract_full_name(self):
+        html_content = read_html_file(self.data + '/messages/index-messages.html')
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        full_name_div = None
+        for item in soup.find_all('div', class_='item'):
+            if item.find('div', class_='item__tertiary', string='Полное имя'):
+                full_name_div = item
+                break
+
+        if full_name_div:
+            full_name = full_name_div.find('div').text.strip()
+            return full_name
+        else:
+            return DEFAULT_VALUE
 
     def parse_index(self):
         index_messages = read_html_file(self.data + '/messages/index-messages.html')
@@ -207,9 +224,10 @@ class VkProcessor(Processor):
 
     def run(self):
         self.user_id_mapper = self.custom_target_user_id
+        self.target_user_nickname = self.extract_full_name()
         self.process_chats(self.parse_index())
 
-    def start_process_chat(self, chat, user_id_mapper):
+    def start_process_chat(self, chat):
         def extract_number_from_filename(filepath):
             match = re.search(r'messages(\d+)\.html', filepath)
             if match:
@@ -230,13 +248,19 @@ class VkProcessor(Processor):
         chat_folder_path = self.data + '/messages/' + chat['id']
         #if chat['id'] == '2000000151':#'240400996':
         chat['messages'] = message_generator(chat_folder_path)
-        return VkMessageProcessor(user_id_mapper)
+        return VkMessageProcessor(self.user_id_mapper, self.target_user_nickname)
 
     def finish_process_chat(self):
         messages = self.message_processor.data
         if len(messages) == 0:
             return pd.DataFrame()
         self.chat_info['chat_users_count'] = len(set(messages['active_user_id']))
+        if self.chat_info['chat_users_count'] == 2:
+            self.chat_info['partner_used_id'] = next(iter(set(messages['active_user_id']) - {self.custom_target_user_id}))
+            self.chat_info['partner_user_nickname'] = next(iter(set(messages['active_user_nickname']) - {self.target_user_nickname}))
+        else:
+            self.chat_info['partner_used_id'] = DEFAULT_VALUE_NUM
+            self.chat_info['partner_user_nickname'] = DEFAULT_VALUE
         data = {key: [value] * len(next(iter(messages.values()))) for key, value in self.chat_info.items()}
         data.update(messages)
         return pd.DataFrame(data)

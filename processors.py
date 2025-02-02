@@ -23,7 +23,7 @@ class Processor(ABC):
         self.all_chats = int(chats_len)
         processed_num = 0
         for chat in chats:
-            self.message_processor = self.start_process_chat(chat, self.user_id_mapper)
+            self.message_processor = self.start_process_chat(chat)
             for message in chat['messages']:
                 if not self.message_processor.continue_processing:
                     break
@@ -39,7 +39,7 @@ class Processor(ABC):
             chat.clear()
 
     @abstractmethod
-    def start_process_chat(self, chat, user_id_mapper):
+    def start_process_chat(self, chat):
         pass
 
     @abstractmethod
