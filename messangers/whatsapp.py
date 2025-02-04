@@ -25,22 +25,30 @@ class WhatsappMessageProcessor(MessageProcessor):
 
         patterns_formats = [
             (r'^\[(\d{1,2})\.(\d{1,2})\.(\d{4}), (\d{2}):(\d{2}):(\d{2})\]', '%d.%m.%Y, %H:%M:%S'),
+            (r'^\[(\d{1,2})\.(\d{1,2})\.(\d{2}), (\d{2}):(\d{2}):(\d{2})\]', '%d.%m.%y, %H:%M:%S'),
+            # [dd.mm.yy, hh:mm:ss]
             (r'^(\d{1,2})\.(\d{1,2})\.(\d{4}), (\d{2}):(\d{2}) -', '%d.%m.%Y, %H:%M'),
             (r'^(\d{1,2})/(\d{1,2})/(\d{2}), (\d{2}):(\d{2}) -', '%m/%d/%y, %H:%M'),
         ]
+
         for pattern, date_format in patterns_formats:
             match = re.match(pattern, sanitized_message)
             if match:
-                if date_format == '%d.%m.%Y, %H:%M:%S':
-                    timestamp_str = f"{match.group(1)}.{match.group(2)}.{match.group(3)}, {match.group(4)}:{match.group(5)}:{match.group(6)}"
-                elif date_format == '%d.%m.%Y, %H:%M':
-                    timestamp_str = f"{match.group(1)}.{match.group(2)}.{match.group(3)}, {match.group(4)}:{match.group(5)}"
-                elif date_format == '%m/%d/%y, %H:%M':
-                    timestamp_str = f"{match.group(1)}/{match.group(2)}/{match.group(3)}, {match.group(4)}:{match.group(5)}"
+                if 'y' in date_format:
+                    # Special handling for yy format (as %y is two digits)
+                    if '%H:%M:%S' in date_format:
+                        timestamp_str = f"{match.group(1)}.{match.group(2)}.{match.group(3)}, {match.group(4)}:{match.group(5)}:{match.group(6)}"
+                    else:
+                        timestamp_str = f"{match.group(1)}.{match.group(2)}.{match.group(3)}, {match.group(4)}:{match.group(5)}"
+                else:
+                    if '%H:%M:%S' in date_format:
+                        timestamp_str = f"{match.group(1)}.{match.group(2)}.{match.group(3)}, {match.group(4)}:{match.group(5)}:{match.group(6)}"
+                    else:
+                        timestamp_str = f"{match.group(1)}.{match.group(2)}.{match.group(3)}, {match.group(4)}:{match.group(5)}"
                 dt = datetime.strptime(timestamp_str, date_format)
                 return int(dt.timestamp())
 
-        raise Exception("Can't parse timestamp from: " + str(self.message))
+        raise Exception("Can't parse timestamp from: " + str(self.message[:100]))
 
     def get_message_type(self):
         content = self.get_content()
@@ -125,7 +133,8 @@ class WhatsappMessageProcessor(MessageProcessor):
         timestamp_patterns = [
             r'^\[\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}:\d{2}\]',  # [dd.mm.yyyy, hh:mm:ss]
             r'^\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2} -',  # dd.mm.yyyy, hh:mm -
-            r'^\d{1,2}/\d{1,2}/\d{2}, \d{2}:\d{2} -'  # m/d/yy, hh:mm -
+            r'^\d{1,2}/\d{1,2}/\d{2}, \d{2}:\d{2} -',  # m/d/yy, hh:mm -
+            r'^\[\d{2}\.\d{2}\.\d{2}, \d{2}:\d{2}:\d{2}\]' # [dd.mm.yy, hh:mm:ss]
         ]
 
         for i, pattern in enumerate(timestamp_patterns):
@@ -189,7 +198,8 @@ class WhatsappProcessor(Processor):
         timestamp_patterns = [
             r'^\[\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}:\d{2}\]',  # [dd.mm.yyyy, hh:mm:ss]
             r'^\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2} -',          # dd.mm.yyyy, hh:mm -
-            r'^\d{1,2}/\d{1,2}/\d{2}, \d{2}:\d{2} -'         # m/d/yy, hh:mm - (allows single-digit month and day)
+            r'^\d{1,2}/\d{1,2}/\d{2}, \d{2}:\d{2} -',         # m/d/yy, hh:mm - (allows single-digit month and day)
+            r'^\[\d{2}\.\d{2}\.\d{2}, \d{2}:\d{2}:\d{2}\]'  # [dd.mm.yy, hh:mm:ss]
         ]
         combined_pattern = '|'.join(timestamp_patterns)
         lines = raw_data.split('\n')

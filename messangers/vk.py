@@ -116,6 +116,12 @@ class VkMessageProcessor(MessageProcessor):
     def get_video_count(self):
         return 1 if self.check_if_video() else 0
 
+    def check_if_sticker(self):
+        attachment_description = self.message.find('div', class_='attachment__description')
+        if attachment_description and 'Стикер' in attachment_description.text:
+            return True
+        return False
+
     def get_message_text(self):
         header_div = self.message.find('div', class_='message__header')
         message_text_div = header_div.find_next_sibling('div')
@@ -140,7 +146,7 @@ class VkMessageProcessor(MessageProcessor):
         return {
             "symbols_count": count_symbols(message_text),
             "links_count": count_links(message_text),
-            "emoji_count": count_emoji(message_text) + count_emoji(self.message.get('sticker_emoji', ''))
+            "emoji_count": count_emoji(message_text) + count_emoji(self.message.get('sticker_emoji', '')) + int(self.check_if_sticker())
         }
 
     def update_aggregated_chat_info(self):
@@ -191,7 +197,7 @@ class VkProcessor(Processor):
         self.data = data
 
     def extract_full_name(self):
-        html_content = read_html_file(self.data + '/messages/index-messages.html')
+        html_content = read_html_file(self.data + '/profile/page-info.html')
         soup = BeautifulSoup(html_content, 'html.parser')
 
         full_name_div = None
@@ -201,7 +207,7 @@ class VkProcessor(Processor):
                 break
 
         if full_name_div:
-            full_name = full_name_div.find('div').text.strip()
+            full_name = full_name_div.find_all('div')[1].text.strip()
             return full_name
         else:
             return DEFAULT_VALUE
