@@ -30,6 +30,10 @@ jobs:
       - name: Build Windows executable
         run: pyinstaller --onefile main.py --add-data "C:\\hostedtoolcache\\windows\\Python\\3.9.13\\x64\\Lib\\site-packages\\emoji\\unicode_codes\\emoji.json;emoji/unicode_codes"
 
+      - name: Create ZIP Archive
+        run: |
+          powershell Compress-Archive -Path dist/main.exe -DestinationPath dist/main.zip
+
       - name: Generate release tag for Windows
         id: tag-windows
         run: |
@@ -52,7 +56,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.tag-windows.outputs.release_tag }}
-          files: dist/main.exe
+          files: dist/main.zip
 
   build-linux:
     runs-on: ubuntu-20.04
