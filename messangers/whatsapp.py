@@ -12,6 +12,10 @@ from processors import Processor
 from utils import MessageType, DEFAULT_VALUE, Platform, DEFAULT_VALUE_NUM, get_hash
 
 
+def return_num(ok):
+    return 1 if ok else 0
+
+
 class WhatsappMessageProcessor(MessageProcessor):
     def __init__(self, user_id_mapper):
         super().__init__(user_id_mapper)
@@ -24,29 +28,25 @@ class WhatsappMessageProcessor(MessageProcessor):
         sanitized_message = self.sanitize_input(self.message)
 
         patterns_formats = [
-            (r'^\[(\d{1,2})\.(\d{1,2})\.(\d{4}), (\d{2}):(\d{2}):(\d{2})\]', '%d.%m.%Y, %H:%M:%S'),
-            (r'^\[(\d{1,2})\.(\d{1,2})\.(\d{2}), (\d{2}):(\d{2}):(\d{2})\]', '%d.%m.%y, %H:%M:%S'),
+            # [dd.mm.yyyy, hh:mm:ss]
+            (r'^\[?(\d{1,2})\.(\d{1,2})\.(\d{4}), (\d{2}):(\d{2}):(\d{2})\]?', '%d.%m.%Y, %H:%M:%S'),
             # [dd.mm.yy, hh:mm:ss]
-            (r'^(\d{1,2})\.(\d{1,2})\.(\d{4}), (\d{2}):(\d{2}) -', '%d.%m.%Y, %H:%M'),
-            (r'^(\d{1,2})/(\d{1,2})/(\d{2}), (\d{2}):(\d{2}) -', '%m/%d/%y, %H:%M'),
+            (r'^\[?(\d{1,2})\.(\d{1,2})\.(\d{2}), (\d{2}):(\d{2}):(\d{2})\]?', '%d.%m.%y, %H:%M:%S'),
+            # [dd.mm.yyyy, hh:mm]
+            (r'^\[?(\d{1,2})\.(\d{1,2})\.(\d{4}), (\d{2}):(\d{2})\]?', '%d.%m.%Y, %H:%M'),
+            # [dd.mm.yy, hh:mm]
+            (r'^\[?(\d{1,2})\.(\d{1,2})\.(\d{2}), (\d{2}):(\d{2})\]?', '%d.%m.%y, %H:%M'),
+            # [mm/dd/yy, hh:mm]
+            (r'^\[?(\d{1,2})/(\d{1,2})/(\d{2}), (\d{2}):(\d{2})\]?', '%m/%d/%y, %H:%M'),
         ]
 
         for pattern, date_format in patterns_formats:
             match = re.match(pattern, sanitized_message)
             if match:
-                if 'y' in date_format:
-                    # Special handling for yy format (as %y is two digits)
-                    if '%H:%M:%S' in date_format:
-                        timestamp_str = f"{match.group(1)}.{match.group(2)}.{match.group(3)}, {match.group(4)}:{match.group(5)}:{match.group(6)}"
-                    else:
-                        timestamp_str = f"{match.group(1)}.{match.group(2)}.{match.group(3)}, {match.group(4)}:{match.group(5)}"
-                else:
-                    if '%H:%M:%S' in date_format:
-                        timestamp_str = f"{match.group(1)}.{match.group(2)}.{match.group(3)}, {match.group(4)}:{match.group(5)}:{match.group(6)}"
-                    else:
-                        timestamp_str = f"{match.group(1)}.{match.group(2)}.{match.group(3)}, {match.group(4)}:{match.group(5)}"
+                timestamp_str = match.group(0).strip('[]')
                 dt = datetime.strptime(timestamp_str, date_format)
-                return int(dt.timestamp())
+                t = int(dt.timestamp())
+                return t
 
         raise Exception("Can't parse timestamp from: " + str(self.message[:100]))
 
@@ -57,18 +57,20 @@ class WhatsappMessageProcessor(MessageProcessor):
                 return MessageType.CALL_AUDIO
             elif "Video call" in content:
                 return MessageType.CALL_VIDEO
-            elif ".opus>" in content or 'audio omitted' == content:
+            elif ".opus>" in content or 'audio omitted' == content or 'аудиофайл отсутствует' in content:
                 return MessageType.MESSAGE_VOICE
             else:
                 return MessageType.MESSAGE
         return MessageType.CALL_UNDEFINED
 
     def get_symbols_count(self):
-        return self.message_structure['symbols_count']
+        return 0 if self.get_picture_count() > 0 or self.get_message_type() != MessageType.MESSAGE else self.message_structure['symbols_count']
 
     def get_picture_count(self):
         content = self.get_content()
-        return int(bool(re.search(r'<attached:.*\.jpg>', content, re.IGNORECASE))) + (1 if (content == 'image omitted' or content == 'GIF omitted') else 0)
+        return return_num(content == 'image omitted' or content == 'GIF omitted') \
+            + return_num(".jpg" in content) \
+            + return_num("изображение отсутствует" in content)
 
     def get_emoji_count(self):
         return self.message_structure['emoji_count']
@@ -94,10 +96,10 @@ class WhatsappMessageProcessor(MessageProcessor):
         def count_links(text):
             url_pattern = r'(https?://(?:www\.)?[^\s]+)'
             links = re.findall(url_pattern, text)
-            return len(links)
+            return len(links) + int('.docx' in text) + int('.pptx' in text)
 
         def count_symbols(text):
-            return len(text)
+            return 0 if self.get_picture_count() > 0 or self.get_message_type() != MessageType.MESSAGE else len(text)
 
         def count_emoji(text):
             emoji_list = [char for char in text if char in emoji.EMOJI_DATA]
