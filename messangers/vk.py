@@ -167,7 +167,7 @@ class VkMessageProcessor(MessageProcessor):
         header = self.message.find('div', class_='message__header')
         if header.find('a'):
             href = header.find('a')['href']
-            return int(re.split('id|public|club', href)[-1])
+            return int(re.split('event|id|public|club', href)[-1])
         else:
             return self.get_target_used_id()
 
