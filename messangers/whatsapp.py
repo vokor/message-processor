@@ -64,7 +64,8 @@ class WhatsappMessageProcessor(MessageProcessor):
         return MessageType.CALL_UNDEFINED
 
     def get_symbols_count(self):
-        return 0 if self.get_picture_count() > 0 or self.get_message_type() != MessageType.MESSAGE else self.message_structure['symbols_count']
+        not_text = self.get_picture_count() > 0 or self.get_video_count() > 0 or self.get_message_type() != MessageType.MESSAGE
+        return 0 if not_text else self.message_structure['symbols_count']
 
     def get_picture_count(self):
         content = self.get_content()
@@ -90,16 +91,19 @@ class WhatsappMessageProcessor(MessageProcessor):
 
     def get_video_count(self):
         content = self.get_content()
-        return int(bool(re.search(r'<attached:.*\.(mp4|mov)>', content, re.IGNORECASE))) + (1 if content == 'video omitted' else 0)
+        return int(bool(re.search(r'<attached:.*\.(mp4|mov)>', content, re.IGNORECASE))) \
+            + return_num('video omitted' in content) \
+            + return_num('видео отсутствует' in content)
 
     def count_aggregates(self):
         def count_links(text):
             url_pattern = r'(https?://(?:www\.)?[^\s]+)'
             links = re.findall(url_pattern, text)
-            return len(links) + int('.docx' in text) + int('.pptx' in text)
+            return len(links) + int('.docx' in text) + int('.pptx' in text) + int('.pdf' in text)
 
         def count_symbols(text):
-            return 0 if self.get_picture_count() > 0 or self.get_message_type() != MessageType.MESSAGE else len(text)
+            not_text = self.get_picture_count() > 0 or self.get_video_count() > 0 or self.get_message_type() != MessageType.MESSAGE
+            return 0 if not_text else len(text)
 
         def count_emoji(text):
             emoji_list = [char for char in text if char in emoji.EMOJI_DATA]
