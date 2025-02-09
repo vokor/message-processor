@@ -150,7 +150,7 @@ class WhatsappMessageProcessor(MessageProcessor):
                 res = ': '.join(parts[1:]).replace('\r\n', '').replace('\n', '')
                 return res
 
-        return ""
+        raise Exception("Failed to get content for message with start: " + self.message[:50])
 
     def get_active_user_nickname(self):
         match = re.search(r'[\]\-] (.*?):', self.message)
