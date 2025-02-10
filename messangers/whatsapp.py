@@ -40,16 +40,16 @@ class WhatsappMessageProcessor(MessageProcessor):
             (r'^\[?(\d{1,2})/(\d{1,2})/(\d{2}), (\d{2}):(\d{2})\]?', '%m/%d/%y, %H:%M'),
         ]
 
-        try:  
-            for pattern, date_format in patterns_formats:
-                match = re.match(pattern, sanitized_message)
-                if match:
-                    timestamp_str = match.group(0).strip('[]')
-                    dt = datetime.strptime(timestamp_str, date_format)
+        for pattern, date_format in patterns_formats:
+            match = re.match(pattern, sanitized_message)
+            if match:
+                timestamp_str = match.group(0).strip('[]')
+                dt = datetime.strptime(timestamp_str, date_format)
+                try:
                     t = int(dt.timestamp())
-                    return t
-        except Exception as e:
-            raise Exception(str(e) + "for message: " + str(self.message[:100]))
+                except Exception as e:
+                    t = 0
+                return t
         raise Exception("Can't parse timestamp from: " + str(self.message[:100]))
 
     def get_message_type(self):
