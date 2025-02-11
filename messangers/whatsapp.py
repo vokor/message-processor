@@ -55,9 +55,9 @@ class WhatsappMessageProcessor(MessageProcessor):
     def get_message_type(self):
         content = self.get_content()
         if content:
-            if "Voice call" in content:
+            if "Voice call" in content or "voice call" in content:
                 return MessageType.CALL_AUDIO
-            elif "Video call" in content:
+            elif "Video call" in content or "video call" in content:
                 return MessageType.CALL_VIDEO
             elif ".opus>" in content or 'audio omitted' == content or 'аудиофайл отсутствует' in content:
                 return MessageType.MESSAGE_VOICE
