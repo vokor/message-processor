@@ -28,6 +28,8 @@ class WhatsappMessageProcessor(MessageProcessor):
         sanitized_message = self.sanitize_input(self.message)
 
         patterns_formats = [
+            # [dd-mm-yyyy, hh:mm:ss]
+            (r'^\[?(\d{1,2})-(\d{1,2})-(\d{4}), (\d{2}):(\d{2}):(\d{2})\]?', '%d-%m-%Y, %H:%M:%S'),
             # [dd.mm.yyyy, hh:mm:ss]
             (r'^\[?(\d{1,2})\.(\d{1,2})\.(\d{4}), (\d{2}):(\d{2}):(\d{2})\]?', '%d.%m.%Y, %H:%M:%S'),
             # [dd.mm.yy, hh:mm:ss]
@@ -142,7 +144,8 @@ class WhatsappMessageProcessor(MessageProcessor):
             r'^\[\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}:\d{2}\]',  # [dd.mm.yyyy, hh:mm:ss]
             r'^\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2} -',  # dd.mm.yyyy, hh:mm -
             r'^\d{1,2}/\d{1,2}/\d{2}, \d{2}:\d{2} -',  # m/d/yy, hh:mm -
-            r'^\[\d{2}\.\d{2}\.\d{2}, \d{2}:\d{2}:\d{2}\]' # [dd.mm.yy, hh:mm:ss]
+            r'^\[\d{2}\.\d{2}\.\d{2}, \d{2}:\d{2}:\d{2}\]', # [dd.mm.yy, hh:mm:ss]
+            r'^\[\d{2}-\d{2}-\d{4}, \d{2}:\d{2}:\d{2}\]'  # [dd-mm-yyyy, hh:mm:ss]
         ]
 
         for i, pattern in enumerate(timestamp_patterns):
@@ -207,7 +210,8 @@ class WhatsappProcessor(Processor):
             r'^\[\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}:\d{2}\]',  # [dd.mm.yyyy, hh:mm:ss]
             r'^\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2} -',          # dd.mm.yyyy, hh:mm -
             r'^\d{1,2}/\d{1,2}/\d{2}, \d{2}:\d{2} -',         # m/d/yy, hh:mm - (allows single-digit month and day)
-            r'^\[\d{2}\.\d{2}\.\d{2}, \d{2}:\d{2}:\d{2}\]'  # [dd.mm.yy, hh:mm:ss]
+            r'^\[\d{2}\.\d{2}\.\d{2}, \d{2}:\d{2}:\d{2}\]',  # [dd.mm.yy, hh:mm:ss]
+            r'^\[\d{2}-\d{2}-\d{4}, \d{2}:\d{2}:\d{2}\]'  # [dd-mm-yyyy, hh:mm:ss]
         ]
         combined_pattern = '|'.join(timestamp_patterns)
         lines = raw_data.split('\n')
