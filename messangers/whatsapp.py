@@ -233,8 +233,18 @@ class WhatsappProcessor(Processor):
         return messages
 
     def read_file(self, file_path):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return f.read()
+        errors = []
+        for enc in ('utf-8', 'utf-8-sig', 'cp1251', 'cp866'):
+            try:
+                with open(file_path, 'r', encoding=enc) as f:
+                    return f.read()
+            except UnicodeDecodeError as e:
+                errors.append(
+                    f'encoding={enc}, pos={e.start}, bad_bytes={e.object[e.start:e.end].hex(" ")}'
+                )
+        raise RuntimeError(
+            f'Не удалось определить кодировку файла "{file_path}". ' + '; '.join(errors)
+        )
 
     def start_process_chat(self, chat):
         raw_data = self.read_file(chat['path'])
