@@ -113,6 +113,8 @@ class TelegramMessageProcessor(MessageProcessor):
         return
 
     def need_process_message(self):
+        if 'channel' in self.get_or_else('from_id', 'actor_id'):
+            return False
         return self.message['type'] == 'message' or self.get_message_type() == MessageType.CALL_AUDIO
 
     def get_is_forwarded(self):
