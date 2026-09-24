@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 from abc import ABC, abstractmethod
 
@@ -22,13 +24,39 @@ class Processor(ABC):
         chats_len = float(len(chats))
         self.all_chats = int(chats_len)
         processed_num = 0
-        for chat in chats:
+        for chat_index, chat in enumerate(chats, start=1):
             self.message_processor = self.start_process_chat(chat)
-            for message in chat['messages']:
+            for message_index, message in enumerate(chat['messages'], start=1):
                 if not self.message_processor.continue_processing:
                     break
                 self.message_processor.time = None
-                self.message_processor.process(message)
+                try:
+                    self.message_processor.process(message)
+                except Exception as exc:
+                    # Report structure and location, never the message body.
+                    record = message if isinstance(message, dict) else {}
+                    rich_message = record.get('rich_message')
+                    details = {
+                        'platform': self.context.get('name'),
+                        'chat_id': chat.get('id'),
+                        'chat_index': chat_index,
+                        'message_id': record.get('id'),
+                        'message_index': message_index,
+                        'message_object_type': type(message).__name__,
+                        'type': record.get('type'),
+                        'action': record.get('action'),
+                        'media_type': record.get('media_type'),
+                        'keys': sorted(record.keys()),
+                        'text_present': 'text' in record,
+                        'text_type': type(record['text']).__name__ if 'text' in record else None,
+                        'rich_message_present': 'rich_message' in record,
+                        'rich_message_type': type(rich_message).__name__ if 'rich_message' in record else None,
+                        'rich_message_keys': sorted(rich_message.keys()) if isinstance(rich_message, dict) else None,
+                    }
+                    raise RuntimeError(
+                        'Message processing failed; diagnostics: '
+                        + json.dumps(details, ensure_ascii=False)
+                    ) from exc
             if self.message_processor.continue_processing:
                 self.processed = pd.concat([self.finish_process_chat(), self.processed], ignore_index=True)
             else:
@@ -45,6 +73,3 @@ class Processor(ABC):
     @abstractmethod
     def finish_process_chat(self):
         pass
-
-
-
