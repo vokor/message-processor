@@ -283,7 +283,10 @@ class TelegramMessageProcessor(MessageProcessor):
                 result['emoji_count'] += sum(count_emoji(value) for value in rich_message.sticker_emojis)
             return result
         else:
-            raise Exception("failed to parse message:" + str(self.message))
+            raise ValueError(
+                'Unsupported Telegram text value type: '
+                + type(message_text).__name__
+            )
 
     def update_aggregated_chat_info(self):
         self.message_structure = self.count_aggregates()
