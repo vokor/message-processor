@@ -9,6 +9,190 @@ from processors import Processor
 from utils import MessageType, DEFAULT_VALUE, Platform, DEFAULT_VALUE_NUM
 
 
+class _RichMessageParser:
+    """Read Telegram Desktop's rich_message JSON into legacy text parts.
+
+    Schema: telegramdesktop/tdesktop, export/output/export_output_json.cpp
+    (SerializeRichMessage, SerializeRichBlock and SerializeRichText), checked
+    against commit e9399834de9ea53621ae12cd8d5ddf0b5b4d7950.
+    Formatting adds no characters. Only content fields are traversed; IDs,
+    paths, previews, callback data and old versions of text are not counted.
+    """
+
+    _TEXT_WRAPPERS = {
+        'bold', 'italic', 'underline', 'strikethrough', 'code', 'subscript',
+        'superscript', 'marked', 'spoiler', 'mention', 'hashtag', 'bot_command',
+        'cashtag', 'link', 'email', 'phone', 'bank_card', 'anchor',
+        'mention_name', 'formatted_date', 'diff',
+    }
+    _TEXT_BLOCKS = {'heading', 'paragraph', 'footer', 'thinking', 'code'}
+
+    def __init__(self, rich_message):
+        self.parts = []
+        self.picture_count = 0
+        self.video_count = 0
+        self.seconds_count = 0
+        self.sticker_emojis = []
+        if not isinstance(rich_message, dict):
+            raise ValueError('Telegram rich_message must be an object')
+        self._blocks(rich_message['blocks'])
+
+    def _string(self, value):
+        if not isinstance(value, str):
+            raise ValueError('Telegram rich message text must be a string')
+        self.parts.append(value)
+
+    def _url(self, value):
+        if not isinstance(value, str):
+            raise ValueError('Telegram rich message URL must be a string')
+        # Match the legacy rule: count href links, but not href characters.
+        self.parts.append({'text': '', 'href': value})
+
+    def _text(self, node):
+        if not isinstance(node, dict):
+            raise ValueError('Telegram rich text must be an object')
+        kind = node.get('type')
+        if kind == 'empty':
+            return
+        if kind in {'plain', 'custom_emoji'}:
+            self._string(node['text'])
+        elif kind == 'concat':
+            children = node['text']
+            if not isinstance(children, list):
+                raise ValueError('Telegram rich concat text must be an array')
+            for child in children:
+                self._text(child)
+        elif kind in self._TEXT_WRAPPERS:
+            self._text(node['text'])
+        elif kind == 'text_link':
+            self._text(node['text'])
+            self._url(node['href'])
+        elif kind == 'math':
+            # There is no plain rendered formula in the export. Use its
+            # textual source, without introducing formatting delimiters.
+            self._string(node['source'])
+        elif kind == 'inline_image':
+            self.picture_count += 1
+            self._document(node)
+        elif kind == 'button':
+            self._button(node)
+        else:
+            raise ValueError(f'Unsupported Telegram rich text type: {kind!r}')
+
+    def _caption(self, node):
+        # Media captions contain two RichText objects. Quote captions are
+        # themselves RichText and are handled in the quote branch below.
+        caption = node.get('caption')
+        if caption is not None:
+            if not isinstance(caption, dict):
+                raise ValueError('Telegram rich media caption must be an object')
+            for key in ('text', 'credit'):
+                if key in caption:
+                    self._text(caption[key])
+
+    def _document(self, node, video_block=False):
+        media_type = node.get('media_type')
+        if media_type == 'video_file' or (video_block and media_type is None):
+            self.video_count += 1
+        duration = node.get('duration_seconds', 0)
+        if isinstance(duration, bool) or not isinstance(duration, (int, float)):
+            raise ValueError('Telegram rich media duration must be a number')
+        self.seconds_count += duration
+        if 'sticker_emoji' in node:
+            value = node['sticker_emoji']
+            if not isinstance(value, str):
+                raise ValueError('Telegram sticker_emoji must be a string')
+            self.sticker_emojis.append(value)
+
+    def _button(self, node):
+        self._text(node['text'])
+        action = node['button']
+        if not isinstance(action, dict):
+            raise ValueError('Telegram rich button action must be an object')
+        if action.get('type') in {'url', 'web_view', 'auth'}:
+            if 'url' in action:
+                self._url(action['url'])
+
+    def _blocks(self, blocks):
+        if not isinstance(blocks, list):
+            raise ValueError('Telegram rich blocks must be an array')
+        for block in blocks:
+            self._block(block)
+
+    def _content(self, node):
+        content = node.get('content')
+        if content == 'text':
+            self._text(node['text'])
+        elif content == 'blocks':
+            self._blocks(node['blocks'])
+        else:
+            raise ValueError(f'Unsupported Telegram rich content: {content!r}')
+
+    def _block(self, node):
+        if not isinstance(node, dict):
+            raise ValueError('Telegram rich block must be an object')
+        kind = node.get('type')
+        if kind in self._TEXT_BLOCKS:
+            self._text(node['text'])
+        elif kind == 'author_date':
+            self._text(node['author'])
+        elif kind in {'divider', 'anchor', 'channel'}:
+            return
+        elif kind == 'list':
+            for item in node['items']:
+                self._content(item)
+        elif kind == 'quote':
+            self._content(node)
+            if 'caption' in node:
+                self._text(node['caption'])
+        elif kind == 'photo':
+            # A photo still exists if its file was excluded from the export.
+            self.picture_count += 1
+            if 'url' in node:
+                self._url(node['url'])
+            self._caption(node)
+        elif kind in {'video', 'audio', 'file'}:
+            self._document(node, video_block=(kind == 'video'))
+            self._caption(node)
+        elif kind == 'cover':
+            self._block(node['block'])
+        elif kind in {'embed', 'embed_post'}:
+            if 'url' in node:
+                self._url(node['url'])
+            if kind == 'embed_post':
+                self._blocks(node['blocks'])
+            self._caption(node)
+        elif kind in {'collage', 'slideshow'}:
+            self._blocks(node['items'])
+            self._caption(node)
+        elif kind == 'math':
+            self._string(node['formula'])
+        elif kind == 'table':
+            self._text(node['title'])
+            for row in node['rows']:
+                for cell in row['cells']:
+                    if 'text' in cell:
+                        self._text(cell['text'])
+        elif kind == 'details':
+            self._text(node['title'])
+            self._blocks(node['blocks'])
+        elif kind == 'related_articles':
+            self._text(node['title'])
+            for article in node['articles']:
+                for key in ('title', 'description', 'author'):
+                    if key in article:
+                        self._string(article[key])
+                self._url(article['url'])
+        elif kind in {'map', 'input_map'}:
+            self._caption(node)
+        elif kind == 'button_row':
+            for button in node['buttons']:
+                self._button(button)
+        else:
+            # Never turn unknown content into a silently empty message.
+            raise ValueError(f'Unsupported Telegram rich block type: {kind!r}')
+
+
 class TelegramMessageProcessor(MessageProcessor):
     def __init__(self, user_id_mapper):
         super().__init__(user_id_mapper)
@@ -31,7 +215,7 @@ class TelegramMessageProcessor(MessageProcessor):
         return self.message_structure['symbols_count']
 
     def get_picture_count(self):
-        return 1 if len(self.message.get('photo', '')) > 0 else 0
+        return (1 if len(self.message.get('photo', '')) > 0 else 0) + self.message_structure.get('picture_count', 0)
 
     def get_emoji_count(self):
         return self.message_structure['emoji_count']
@@ -40,10 +224,10 @@ class TelegramMessageProcessor(MessageProcessor):
         return self.message_structure['links_count']
 
     def get_seconds_count(self):
-        return self.message.get('duration_seconds', 0)
+        return self.message.get('duration_seconds', 0) + self.message_structure.get('seconds_count', 0)
 
     def get_video_count(self):
-        return 1 if self.message.get('media_type', '') == 'video_file' else 0
+        return (1 if self.message.get('media_type', '') == 'video_file' else 0) + self.message_structure.get('video_count', 0)
 
     def count_aggregates(self):
         def count_links(text):
@@ -58,7 +242,12 @@ class TelegramMessageProcessor(MessageProcessor):
             emoji_list = [char for char in text if char in emoji.EMOJI_DATA]
             return len(emoji_list)
 
-        message_text = self.message['text']
+        rich_message = None
+        if 'rich_message' in self.message:
+            rich_message = _RichMessageParser(self.message['rich_message'])
+            message_text = rich_message.parts
+        else:
+            message_text = self.message['text']
         if isinstance(message_text, str):
             return {
                 "symbols_count": count_symbols(message_text),
@@ -79,11 +268,20 @@ class TelegramMessageProcessor(MessageProcessor):
                     symbols_count += count_symbols(item)
                     links_count += count_links(item)
                     emoji_count += count_emoji(item)
-            return {
+            result = {
                 "symbols_count": symbols_count,
                 "links_count": links_count,
                 "emoji_count": emoji_count
             }
+            if rich_message is not None:
+                result.update({
+                    "picture_count": rich_message.picture_count,
+                    "video_count": rich_message.video_count,
+                    "seconds_count": rich_message.seconds_count,
+                })
+                result['emoji_count'] += count_emoji(self.message.get('sticker_emoji', ''))
+                result['emoji_count'] += sum(count_emoji(value) for value in rich_message.sticker_emojis)
+            return result
         else:
             raise Exception("failed to parse message:" + str(self.message))
 
